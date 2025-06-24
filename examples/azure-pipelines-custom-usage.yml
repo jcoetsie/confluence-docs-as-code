@@ -1,0 +1,66 @@
+# Example: Using the Step Template in Custom Pipeline
+# This example shows how to integrate confluence publishing into your existing pipeline
+
+trigger:
+  branches:
+    include:
+    - main
+
+pr:
+  branches:
+    include:
+    - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- group: confluence-credentials
+
+jobs:
+- job: CustomBuildJob
+  displayName: 'Custom Build and Test'
+  steps:
+  - task: NodeTool@0
+    displayName: 'Use Node.js 18.x'
+    inputs:
+      versionSpec: '18.x'
+
+  - script: npm ci
+    displayName: 'Install dependencies'
+
+  - script: npm run lint
+    displayName: 'Run linting'
+
+  - script: npm test
+    displayName: 'Run tests'
+
+  - script: npm run build
+    displayName: 'Build project'
+
+  # Add custom steps here (e.g., security scanning, additional tests, etc.)
+  - script: echo "Running custom validation..."
+    displayName: 'Custom validation step'
+
+- job: PublishDocs
+  displayName: 'Publish Documentation'
+  dependsOn: CustomBuildJob
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  
+  steps:
+  - template: templates/confluence-publish-steps.yml
+    parameters:
+      confluence_tenant: $(CONFLUENCE_TENANT)
+      confluence_space: $(CONFLUENCE_SPACE)
+      confluence_user: $(CONFLUENCE_USER)
+      confluence_token: $(CONFLUENCE_TOKEN)
+      confluence_parent_page: 'Documentation Home'
+      confluence_title_prefix: '[PROD] '
+      confluence_force_update: 'no'
+      confluence_cleanup: 'no'
+      kroki_enabled: 'yes'
+      kroki_host: 'https://kroki.io'
+      mermaid_renderer: 'kroki'
+      plantuml_renderer: 'kroki'
+      working_directory: '.'
+      node_version: '18.x'

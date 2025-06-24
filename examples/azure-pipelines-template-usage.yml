@@ -1,0 +1,47 @@
+# Example: Using the Full Job Template
+# This example shows how to use the complete confluence-docs-template.yml
+
+trigger:
+  branches:
+    include:
+    - main
+    - master
+    - develop
+
+pr:
+  branches:
+    include:
+    - main
+    - master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+# Use variable groups for secure credential management
+variables:
+- group: confluence-credentials
+
+extends:
+  template: templates/confluence-docs-template.yml
+  parameters:
+    confluence_tenant: $(CONFLUENCE_TENANT)
+    confluence_space: $(CONFLUENCE_SPACE)
+    confluence_user: $(CONFLUENCE_USER)
+    confluence_token: $(CONFLUENCE_TOKEN)
+    confluence_parent_page: $(CONFLUENCE_PARENT_PAGE)
+    confluence_title_prefix: '[DEV] '
+    confluence_force_update: 'no'
+    confluence_cleanup: 'no'
+    kroki_enabled: 'yes'
+    kroki_host: 'https://kroki.io'
+    mermaid_renderer: 'kroki'
+    plantuml_renderer: 'kroki'
+    node_versions:
+    - '16.x'
+    - '18.x'
+    - '20.x'
+    publish_node_version: '18.x'
+    working_directory: '.'
+    trigger_branches:
+    - 'refs/heads/main'
+    - 'refs/heads/master'

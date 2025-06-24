@@ -1,0 +1,43 @@
+# Example: Using the Template from Another Repository
+# This shows how other repositories can reuse your confluence publishing template
+
+trigger:
+  branches:
+    include:
+    - main
+
+pr: none  # Only publish on main branch
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+# Reference to your template repository
+resources:
+  repositories:
+  - repository: confluence-templates
+    type: git
+    name: YourOrg/confluence-docs-as-code  # Replace with your actual repo path
+    ref: refs/heads/main  # Or specific tag/branch
+
+variables:
+- group: confluence-credentials
+
+extends:
+  template: templates/confluence-docs-template.yml@confluence-templates
+  parameters:
+    confluence_tenant: $(CONFLUENCE_TENANT)
+    confluence_space: 'MY_PROJECT_SPACE'
+    confluence_user: $(CONFLUENCE_USER)
+    confluence_token: $(CONFLUENCE_TOKEN)
+    confluence_parent_page: 'My Project Documentation'
+    confluence_title_prefix: '[My Project] '
+    confluence_force_update: 'no'
+    confluence_cleanup: 'no'
+    kroki_enabled: 'yes'
+    node_versions:
+    - '18.x'
+    - '20.x'
+    publish_node_version: '20.x'
+    working_directory: './docs'  # If your docs are in a subdirectory
+    trigger_branches:
+    - 'refs/heads/main'

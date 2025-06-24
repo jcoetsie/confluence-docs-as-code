@@ -1,0 +1,114 @@
+# Step Template for Publishing to Confluence
+# This template provides just the publishing steps that can be added to any pipeline
+
+parameters:
+- name: confluence_tenant
+  type: string
+  displayName: 'Confluence Tenant'
+  
+- name: confluence_space
+  type: string
+  displayName: 'Confluence Space Key'
+  
+- name: confluence_user
+  type: string
+  displayName: 'Confluence User'
+  
+- name: confluence_token
+  type: string
+  displayName: 'Confluence Token'
+  
+- name: confluence_parent_page
+  type: string
+  displayName: 'Confluence Parent Page'
+  default: ''
+  
+- name: confluence_title_prefix
+  type: string
+  displayName: 'Confluence Title Prefix'
+  default: ''
+  
+- name: confluence_force_update
+  type: string
+  displayName: 'Force Update All Pages'
+  default: 'no'
+  
+- name: confluence_cleanup
+  type: string
+  displayName: 'Cleanup Pages'
+  default: 'no'
+  
+- name: kroki_enabled
+  type: string
+  displayName: 'Enable Kroki'
+  default: 'yes'
+  
+- name: kroki_host
+  type: string
+  displayName: 'Kroki Host'
+  default: 'https://kroki.io'
+  
+- name: mermaid_renderer
+  type: string
+  displayName: 'Mermaid Renderer'
+  default: 'kroki'
+  
+- name: plantuml_renderer
+  type: string
+  displayName: 'PlantUML Renderer'
+  default: 'kroki'
+  
+- name: working_directory
+  type: string
+  displayName: 'Working Directory'
+  default: '.'
+
+- name: node_version
+  type: string
+  displayName: 'Node.js Version'
+  default: '18.x'
+
+steps:
+- task: NodeTool@0
+  displayName: 'Use Node.js ${{ parameters.node_version }}'
+  inputs:
+    versionSpec: '${{ parameters.node_version }}'
+
+- task: Cache@2
+  displayName: 'Cache npm dependencies'
+  inputs:
+    key: 'npm | "$(Agent.OS)" | ${{ parameters.working_directory }}/package-lock.json'
+    restoreKeys: |
+      npm | "$(Agent.OS)"
+      npm
+    path: '~/.npm'
+
+- script: npm ci
+  displayName: 'Install dependencies'
+  workingDirectory: ${{ parameters.working_directory }}
+
+- script: npm run build --if-present
+  displayName: 'Build project'
+  workingDirectory: ${{ parameters.working_directory }}
+
+- script: |
+    echo "Publishing documentation to Confluence..."
+    echo "Tenant: ${{ parameters.confluence_tenant }}"
+    echo "Space: ${{ parameters.confluence_space }}"
+    echo "Working Directory: ${{ parameters.working_directory }}"
+    node dist/index.js
+  displayName: 'Publish to Confluence'
+  workingDirectory: ${{ parameters.working_directory }}
+  env:
+    INPUT_CONFLUENCE_TENANT: ${{ parameters.confluence_tenant }}
+    INPUT_CONFLUENCE_SPACE: ${{ parameters.confluence_space }}
+    INPUT_CONFLUENCE_USER: ${{ parameters.confluence_user }}
+    INPUT_CONFLUENCE_TOKEN: ${{ parameters.confluence_token }}
+    INPUT_CONFLUENCE_PARENT_PAGE: ${{ parameters.confluence_parent_page }}
+    INPUT_CONFLUENCE_TITLE_PREFIX: ${{ parameters.confluence_title_prefix }}
+    INPUT_CONFLUENCE_FORCE_UPDATE: ${{ parameters.confluence_force_update }}
+    INPUT_CONFLUENCE_CLEANUP: ${{ parameters.confluence_cleanup }}
+    INPUT_KROKI_ENABLED: ${{ parameters.kroki_enabled }}
+    INPUT_KROKI_HOST: ${{ parameters.kroki_host }}
+    INPUT_MERMAID_RENDERER: ${{ parameters.mermaid_renderer }}
+    INPUT_PLANTUML_RENDERER: ${{ parameters.plantuml_renderer }}

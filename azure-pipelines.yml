@@ -1,0 +1,101 @@
+# Azure DevOps Pipeline for publishing MkDocs site to Confluence
+# This pipeline will build, test, and publish documentation to Confluence
+
+trigger:
+  branches:
+    include:
+    - main
+    - master
+
+pr:
+  branches:
+    include:
+    - main
+    - master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  # Define your variables here or use variable groups
+  # You can also set these in the Azure DevOps pipeline UI
+  confluence_tenant: $(CONFLUENCE_TENANT)
+  confluence_space: $(CONFLUENCE_SPACE)
+  confluence_user: $(CONFLUENCE_USER)
+  confluence_token: $(CONFLUENCE_TOKEN)
+  confluence_parent_page: $(CONFLUENCE_PARENT_PAGE)
+  confluence_title_prefix: $(CONFLUENCE_TITLE_PREFIX)
+  confluence_force_update: $(CONFLUENCE_FORCE_UPDATE)
+  confluence_cleanup: $(CONFLUENCE_CLEANUP)
+  kroki_enabled: $(KROKI_ENABLED)
+  kroki_host: $(KROKI_HOST)
+  mermaid_renderer: $(MERMAID_RENDERER)
+  plantuml_renderer: $(PLANTUML_RENDERER)
+
+strategy:
+  matrix:
+    Node16:
+      node_version: '16.x'
+    Node18:
+      node_version: '18.x'
+  maxParallel: 2
+
+steps:
+- task: NodeTool@0
+  displayName: 'Use Node.js $(node_version)'
+  inputs:
+    versionSpec: '$(node_version)'
+
+- task: Cache@2
+  displayName: 'Cache npm dependencies'
+  inputs:
+    key: 'npm | "$(Agent.OS)" | package-lock.json'
+    restoreKeys: |
+      npm | "$(Agent.OS)"
+      npm
+    path: '~/.npm'
+
+- script: npm ci
+  displayName: 'Install dependencies'
+
+- script: npm run build
+  displayName: 'Build project'
+  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+
+- script: npm test
+  displayName: 'Run tests'
+
+# Only run the confluence publishing for the main branch and Node 18
+- script: |
+    echo "Publishing to Confluence..."
+    # Set environment variables for the action
+    export INPUT_CONFLUENCE_TENANT="$(confluence_tenant)"
+    export INPUT_CONFLUENCE_SPACE="$(confluence_space)"
+    export INPUT_CONFLUENCE_USER="$(confluence_user)"
+    export INPUT_CONFLUENCE_TOKEN="$(confluence_token)"
+    export INPUT_CONFLUENCE_PARENT_PAGE="$(confluence_parent_page)"
+    export INPUT_CONFLUENCE_TITLE_PREFIX="$(confluence_title_prefix)"
+    export INPUT_CONFLUENCE_FORCE_UPDATE="$(confluence_force_update)"
+    export INPUT_CONFLUENCE_CLEANUP="$(confluence_cleanup)"
+    export INPUT_KROKI_ENABLED="$(kroki_enabled)"
+    export INPUT_KROKI_HOST="$(kroki_host)"
+    export INPUT_MERMAID_RENDERER="$(mermaid_renderer)"
+    export INPUT_PLANTUML_RENDERER="$(plantuml_renderer)"
+    
+    # Run the main script
+    node dist/index.js
+  displayName: 'Publish to Confluence'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['node_version'], '18.x'))
+  env:
+    INPUT_CONFLUENCE_TENANT: $(confluence_tenant)
+    INPUT_CONFLUENCE_SPACE: $(confluence_space)
+    INPUT_CONFLUENCE_USER: $(confluence_user)
+    INPUT_CONFLUENCE_TOKEN: $(confluence_token)
+    INPUT_CONFLUENCE_PARENT_PAGE: $(confluence_parent_page)
+    INPUT_CONFLUENCE_TITLE_PREFIX: $(confluence_title_prefix)
+    INPUT_CONFLUENCE_FORCE_UPDATE: $(confluence_force_update)
+    INPUT_CONFLUENCE_CLEANUP: $(confluence_cleanup)
+    INPUT_KROKI_ENABLED: $(kroki_enabled)
+    INPUT_KROKI_HOST: $(kroki_host)
+    INPUT_MERMAID_RENDERER: $(mermaid_renderer)
+    INPUT_PLANTUML_RENDERER: $(plantuml_renderer)
