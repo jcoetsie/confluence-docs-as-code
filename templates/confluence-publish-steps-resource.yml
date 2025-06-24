@@ -1,6 +1,5 @@
-# Step Template for Publishing to Confluence
-# This template downloads and runs the confluence-docs-as-code action
-# Use this template in repositories that want to publish their docs to Confluence
+# Step Template for Publishing to Confluence (Resource-based)
+# This template uses Azure DevOps resources to reference the action repository
 
 parameters:
 - name: confluence_tenant
@@ -59,9 +58,9 @@ parameters:
   displayName: 'PlantUML Renderer'
   default: 'kroki'
   
-- name: working_directory
+- name: docs_path
   type: string
-  displayName: 'Working Directory (where your mkdocs.yml or docs are located)'
+  displayName: 'Path to documentation (relative to repo root)'
   default: '.'
 
 - name: node_version
@@ -69,56 +68,33 @@ parameters:
   displayName: 'Node.js Version'
   default: '18.x'
 
-- name: action_version
-  type: string
-  displayName: 'Confluence Action Version'
-  default: 'main'
-
-- name: action_repo
-  type: string
-  displayName: 'Confluence Action Repository'
-  default: 'YourOrg/confluence-docs-as-code'  # Replace with your actual repo
-
 steps:
 - task: NodeTool@0
   displayName: 'Use Node.js ${{ parameters.node_version }}'
   inputs:
     versionSpec: '${{ parameters.node_version }}'
 
-- checkout: self
-  displayName: 'Checkout source repository'
-
-- script: |
-    echo "Downloading confluence-docs-as-code action..."
-    # Create a temporary directory for the action
-    mkdir -p $(Agent.TempDirectory)/confluence-action
-    cd $(Agent.TempDirectory)/confluence-action
-    
-    # Download the action using git or curl
-    git clone https://github.com/${{ parameters.action_repo }}.git .
-    git checkout ${{ parameters.action_version }}
-    
-    # Install dependencies and build if needed
-    if [ -f "package.json" ]; then
-      npm ci
-      if grep -q '"build"' package.json; then
-        npm run build
-      fi
-    fi
-  displayName: 'Download and prepare confluence action'
-
 - script: |
     echo "Publishing documentation to Confluence..."
+    echo "Docs path: ${{ parameters.docs_path }}"
     echo "Tenant: ${{ parameters.confluence_tenant }}"
     echo "Space: ${{ parameters.confluence_space }}"
-    echo "Working Directory: ${{ parameters.working_directory }}"
     
-    # Change to the action directory and run it
-    cd $(Agent.TempDirectory)/confluence-action
+    # Change to the action directory (checked out as a resource)
+    cd $(Agent.BuildDirectory)/confluence-action
     
-    # Set the working directory to the source repo's docs
-    export GITHUB_WORKSPACE="$(Build.SourcesDirectory)/${{ parameters.working_directory }}"
+    # Ensure dependencies are installed
+    npm ci
     
+    # Build if needed
+    if [ ! -f "dist/index.js" ]; then
+      npm run build
+    fi
+    
+    # Set the working directory to the docs path
+    export GITHUB_WORKSPACE="$(Build.SourcesDirectory)/${{ parameters.docs_path }}"
+    
+    # Run the action
     node dist/index.js
   displayName: 'Publish to Confluence'
   env:

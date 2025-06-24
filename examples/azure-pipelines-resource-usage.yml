@@ -1,0 +1,47 @@
+# Example: Using the Resource-Based Step Template
+# This shows how to use the confluence publisher from another repository
+
+trigger:
+  branches:
+    include:
+    - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+# Reference the confluence action repository as a resource
+resources:
+  repositories:
+  - repository: confluence-action
+    type: git
+    name: YourOrg/confluence-docs-as-code  # Replace with your actual repo
+    ref: refs/heads/main
+
+variables:
+- group: confluence-credentials
+
+jobs:
+- job: PublishDocs
+  displayName: 'Publish Documentation to Confluence'
+  
+  steps:
+  # Check out the source repo (contains your documentation)
+  - checkout: self
+    displayName: 'Checkout documentation source'
+  
+  # Check out the confluence action
+  - checkout: confluence-action
+    displayName: 'Checkout confluence action'
+    path: 'confluence-action'
+  
+  # Use the resource-based template
+  - template: templates/confluence-publish-steps-resource.yml@confluence-action
+    parameters:
+      confluence_tenant: $(CONFLUENCE_TENANT)
+      confluence_space: $(CONFLUENCE_SPACE)
+      confluence_user: $(CONFLUENCE_USER)
+      confluence_token: $(CONFLUENCE_TOKEN)
+      confluence_parent_page: 'My Project Documentation'
+      confluence_title_prefix: '[My Project] '
+      docs_path: './docs'  # Path to your documentation in your repo
+      node_version: '18.x'

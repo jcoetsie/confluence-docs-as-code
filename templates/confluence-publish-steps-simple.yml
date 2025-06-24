@@ -1,6 +1,5 @@
-# Step Template for Publishing to Confluence
-# This template downloads and runs the confluence-docs-as-code action
-# Use this template in repositories that want to publish their docs to Confluence
+# Step Template for Publishing to Confluence (Simplified)
+# This template downloads the pre-built action and runs it against your documentation
 
 parameters:
 - name: confluence_tenant
@@ -69,57 +68,63 @@ parameters:
   displayName: 'Node.js Version'
   default: '18.x'
 
-- name: action_version
-  type: string
-  displayName: 'Confluence Action Version'
-  default: 'main'
-
-- name: action_repo
-  type: string
-  displayName: 'Confluence Action Repository'
-  default: 'YourOrg/confluence-docs-as-code'  # Replace with your actual repo
-
 steps:
 - task: NodeTool@0
   displayName: 'Use Node.js ${{ parameters.node_version }}'
   inputs:
     versionSpec: '${{ parameters.node_version }}'
 
-- checkout: self
-  displayName: 'Checkout source repository'
+- checkout: none
+  displayName: 'Skip default checkout (we only need our working directory)'
 
+- checkout: self
+  displayName: 'Checkout documentation source'
+  path: 'docs-source'
+
+# Alternative approach: Use the action as a resource
 - script: |
-    echo "Downloading confluence-docs-as-code action..."
-    # Create a temporary directory for the action
-    mkdir -p $(Agent.TempDirectory)/confluence-action
-    cd $(Agent.TempDirectory)/confluence-action
+    echo "Setting up confluence publisher..."
     
-    # Download the action using git or curl
-    git clone https://github.com/${{ parameters.action_repo }}.git .
-    git checkout ${{ parameters.action_version }}
-    
-    # Install dependencies and build if needed
-    if [ -f "package.json" ]; then
+    # Install the confluence publisher globally or use npx
+    npm install -g md-to-confluence-action@latest || {
+      echo "Package not available, using direct approach..."
+      
+      # Create working directory
+      mkdir -p $(Agent.TempDirectory)/confluence-publisher
+      cd $(Agent.TempDirectory)/confluence-publisher
+      
+      # Download the latest release or specific version
+      curl -L https://github.com/YourOrg/confluence-docs-as-code/archive/refs/heads/main.zip -o action.zip
+      unzip action.zip
+      cd confluence-docs-as-code-main
+      
+      # Install and build
       npm ci
-      if grep -q '"build"' package.json; then
-        npm run build
-      fi
-    fi
-  displayName: 'Download and prepare confluence action'
+      npm run build
+      
+      # Make it available globally
+      export CONFLUENCE_ACTION_PATH="$(pwd)"
+      echo "##vso[task.setvariable variable=CONFLUENCE_ACTION_PATH]$(pwd)"
+    }
+  displayName: 'Setup Confluence Publisher'
 
 - script: |
     echo "Publishing documentation to Confluence..."
     echo "Tenant: ${{ parameters.confluence_tenant }}"
     echo "Space: ${{ parameters.confluence_space }}"
-    echo "Working Directory: ${{ parameters.working_directory }}"
+    echo "Working Directory: $(Build.SourcesDirectory)/docs-source/${{ parameters.working_directory }}"
     
-    # Change to the action directory and run it
-    cd $(Agent.TempDirectory)/confluence-action
+    # Change to the documentation directory
+    cd "$(Build.SourcesDirectory)/docs-source/${{ parameters.working_directory }}"
     
-    # Set the working directory to the source repo's docs
-    export GITHUB_WORKSPACE="$(Build.SourcesDirectory)/${{ parameters.working_directory }}"
-    
-    node dist/index.js
+    # Run the confluence publisher
+    if command -v md-to-confluence-action >/dev/null 2>&1; then
+      md-to-confluence-action
+    else
+      # Use the downloaded version
+      cd "$CONFLUENCE_ACTION_PATH"
+      node dist/index.js
+    fi
   displayName: 'Publish to Confluence'
   env:
     INPUT_CONFLUENCE_TENANT: ${{ parameters.confluence_tenant }}
@@ -134,3 +139,4 @@ steps:
     INPUT_KROKI_HOST: ${{ parameters.kroki_host }}
     INPUT_MERMAID_RENDERER: ${{ parameters.mermaid_renderer }}
     INPUT_PLANTUML_RENDERER: ${{ parameters.plantuml_renderer }}
+    GITHUB_WORKSPACE: $(Build.SourcesDirectory)/docs-source/${{ parameters.working_directory }}
