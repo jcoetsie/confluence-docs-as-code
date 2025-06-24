@@ -81,7 +81,7 @@ steps:
     echo "Space: ${{ parameters.confluence_space }}"
     
     # Change to the action directory (checked out as a resource)
-    cd $(Agent.BuildDirectory)/confluence-action
+    cd $(Agent.BuildDirectory)/confluence-templates
     
     # Ensure dependencies are installed
     npm ci
